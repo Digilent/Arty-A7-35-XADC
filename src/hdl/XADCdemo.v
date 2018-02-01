@@ -30,7 +30,8 @@ module XADCdemo(
 
  );
    
-   wire enable;  
+   wire enable;
+   reg bad_address = 0;  
    wire ready;
    wire [15:0] data;   
    reg [6:0] Address_in;     
@@ -41,7 +42,7 @@ module XADCdemo(
         (
         .daddr_in(Address_in),            // Address bus for the dynamic reconfiguration port
         .dclk_in(CLK100MHZ),             // Clock input for the dynamic reconfiguration port
-        .den_in(enable & |sw),              // Enable Signal for the dynamic reconfiguration port
+        .den_in(enable & ~bad_address),              // Enable Signal for the dynamic reconfiguration port
         .di_in(0),               // Input data bus for the dynamic reconfiguration port
         .dwe_in(0),              // Write Enable for the dynamic reconfiguration port
         .reset_in(0),            // Reset signal for the System Monitor control logic
@@ -74,11 +75,13 @@ module XADCdemo(
         .vauxp14(ck_an_p[8]),             // Auxiliary channel 15
         .vauxn14(ck_an_n[8])
     );
-    
+    reg _ready = 0;
+    always@(posedge CLK100MHZ)
+        _ready <= ready;
       //led visual dmm              
-      always @(posedge ready)
-      begin
-          case (data[15:13])
+    always @(posedge CLK100MHZ)
+        if (ready == 1 && _ready == 0) begin
+            case (data[15:13])
             1:  LED <= 8'b11;
             2:  LED <= 8'b111;
             3:  LED <= 8'b1111; 
@@ -86,24 +89,29 @@ module XADCdemo(
             5:  LED <= 8'b111111;
             6:  LED <= 8'b1111111;
             7:  LED <= 8'b11111111;
-           default: LED <= 8'b0; 
-           endcase
+            default: LED <= 8'b0; 
+            endcase
         end
            
       //switch driver to choose channel
-      always @(negedge ready)
-      begin
-        case(sw)
-        0: Address_in <= 8'h14; //A0
-        1: Address_in <= 8'h15; //A1
-        2: Address_in <= 8'h16; //A2
-        3: Address_in <= 8'h17; //A3
-        4: Address_in <= 8'h1F; //A4
-        5: Address_in <= 8'h10; //A5
-        6: Address_in <= 8'h1C; //A6 - A7 differential
-        7: Address_in <= 8'h1D; //A8 - A9 differential
-        8: Address_in <= 8'h1E; //A10 - A11 diferential
-        default: Address_in <= 8'h14; //A0
-        endcase
+    always @(posedge CLK100MHZ)
+        if (ready == 0 && _ready == 1) begin
+            case(sw)
+            0: Address_in <= 8'h14; //A0
+            1: Address_in <= 8'h15; //A1
+            2: Address_in <= 8'h16; //A2
+            3: Address_in <= 8'h17; //A3
+            4: Address_in <= 8'h1F; //A4
+            5: Address_in <= 8'h10; //A5
+            6: Address_in <= 8'h1C; //A6 - A7 differential
+            7: Address_in <= 8'h1D; //A8 - A9 differential
+            8: Address_in <= 8'h1E; //A10 - A11 diferential
+            default: Address_in <= 8'h14; //A0
+            endcase
+            
+            if (sw >= 4'h9) // switch default case
+                bad_address <= 1'b1;
+            else
+                bad_address <= 1'b0;
       end
 endmodule
